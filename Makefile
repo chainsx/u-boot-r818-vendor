@@ -83,19 +83,6 @@ else
   Q = @
 endif
 
-buildconfig = ../../../.buildconfig
-ifeq ($(buildconfig), $(wildcard $(buildconfig)))
-	LICHEE_BUSSINESS=$(shell cat $(buildconfig) | grep -w "LICHEE_BUSSINESS" | awk -F= '{printf $$2}')
-	LICHEE_CHIP_CONFIG_DIR=$(shell cat $(buildconfig) | grep -w "LICHEE_CHIP_CONFIG_DIR" | awk -F= '{printf $$2}')
-	LICHEE_ARCH=$(shell cat $(buildconfig) | grep -w "LICHEE_ARCH" | awk -F= '{printf $$2}')
-	LICHEE_IC=$(shell cat $(buildconfig) | grep -w "LICHEE_IC" | awk -F= '{printf $$2}')
-	LICHEE_CHIP=$(shell cat $(buildconfig) | grep -w "LICHEE_CHIP" | awk -F= '{printf $$2}')
-	LICHEE_BOARD=$(shell cat $(buildconfig) | grep -w "LICHEE_BOARD" | awk -F= '{printf $$2}')
-	LICHEE_PLAT_OUT=$(shell cat $(buildconfig) | grep -w "LICHEE_PLAT_OUT" | awk -F= '{printf $$2}')
-	LICHEE_BOARD_CONFIG_DIR=$(shell cat $(buildconfig) | grep -w "LICHEE_BOARD_CONFIG_DIR" | awk -F= '{printf $$2}')
-	export LICHEE_BUSSINESS LICHEE_CHIP_CONFIG_DIR LICHEE_IC LICHEE_ARCH LICHEE_CHIP LICHEE_BOARD LICHEE_PLAT_OUT LICHEE_BOARD_CONFIG_DIR
-endif
-
 # If the user is running make -s (silent mode), suppress echoing of
 # commands
 
@@ -265,36 +252,6 @@ ifeq (x$(config_check), xyes)
 endif
 endif
 
-#########################################################################
-RISCV_PATH=riscv64-linux-x86_64-20200528
-riscv_toolchain_check=$(shell if [ ! -d ../tools/toolchain/$(RISCV_PATH) ]; then echo yes; else echo no; fi;)
-ifeq (x$(riscv_toolchain_check), xyes)
-$(info Prepare riscv toolchain ...);
-$(shell mkdir -p ../tools/toolchain/$(RISCV_PATH) || exit 1)
-$(shell tar --strip-components=1 -xf ../tools/toolchain/$(RISCV_PATH).tar.xz -C ../tools/toolchain/$(RISCV_PATH) || exit 1)
-endif
-arm_toolchain_check=$(shell if [ ! -d ../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi ]; then echo yes; else echo no; fi;)
-ifeq (x$(arm_toolchain_check), xyes)
-$(info Prepare arm toolchain ...);
-$(shell mkdir -p ../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi || exit 1)
-$(shell tar --strip-components=1 -xf ../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi.tar.xz -C ../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi || exit 1)
-endif
-
-
-ifeq (x$(CONFIG_RISCV), xy)
-CROSS_COMPILE := $(srctree)/../tools/toolchain/$(RISCV_PATH)/bin/riscv64-unknown-linux-gnu-
-DTS_PATH := $(PWD)/arch/riscv/dts
-endif
-
-ifeq (x$(CONFIG_ARM), xy)
-CROSS_COMPILE := $(srctree)/../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi/bin/arm-linux-gnueabi-
-DTS_PATH := $(PWD)/arch/arm/dts
-endif
-
-CROSS_COMPILE ?= $(srctree)/../tools/toolchain/gcc-linaro-7.2.1-2017.11-x86_64_arm-linux-gnueabi/bin/arm-linux-gnueabi-
-DTS_PATH ?= $(PWD)/arch/arm/dts
-
-#######################################################################
 # set default to nothing for native builds
 ifeq ($(HOSTARCH),$(ARCH))
 CROSS_COMPILE ?=
@@ -417,7 +374,7 @@ PERL		= perl
 PYTHON		?= python
 PYTHON2		= python2
 PYTHON3		= python3
-DTC		?= $(objtree)/scripts/dtc/dtc
+DTC		?= dtc
 CHECK		= sparse
 
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
@@ -428,7 +385,7 @@ KBUILD_CPPFLAGS := -D__KERNEL__ -D__UBOOT__
 KBUILD_CFLAGS   := -Wall -Wstrict-prototypes \
 		   -Wno-format-security \
 		   -fno-builtin -ffreestanding $(CSTD_FLAG) \
-		   -Werror
+		   -Wno-array-parameter -Wno-attributes
 KBUILD_CFLAGS	+= -fshort-wchar
 KBUILD_AFLAGS   := -D__ASSEMBLY__
 
@@ -887,7 +844,7 @@ endif
 
 # Always append ALL so that arch config.mk's can add custom ones
 ALL-y += u-boot.srec u-boot.bin u-boot.sym System.map binary_size_check
-ALL-$(CONFIG_ARCH_SUNXI) += u-boot-$(CONFIG_SYS_CONFIG_NAME).bin
+#ALL-$(CONFIG_ARCH_SUNXI) += u-boot-$(CONFIG_SYS_CONFIG_NAME).bin
 
 ALL-$(CONFIG_ONENAND_U_BOOT) += u-boot-onenand.bin
 ifeq ($(CONFIG_SPL_FSL_PBL),y)
