@@ -75,6 +75,7 @@ ulong monitor_flash_len;
 extern int sunxi_burn_rotpk(void);
 #endif
 
+unsigned int disp_param_flag;
 static int initr_env(void);
 
 __weak int board_flash_wp_on(void)
@@ -517,6 +518,9 @@ static int init_spi_all(void)
 }
 #endif
 
+#ifdef CONFIG_SUNXI_MELIS_AUTO_UPDATE
+extern int melis_auto_update_check(void);
+#endif
 
 #ifdef CONFIG_ARCH_SUNXI
 static int initr_sunxi_plat(void)
@@ -527,7 +531,7 @@ static int initr_sunxi_plat(void)
 	check_ir_boot_recovery();
 #endif
 #if defined(CONFIG_SUNXI_HOMLET)
-	sunxi_boot_init_gpio();
+	//sunxi_boot_init_gpio();
 #endif
 
 #ifdef CONFIG_RECOVERY_KEY
@@ -537,13 +541,28 @@ static int initr_sunxi_plat(void)
 #if defined(CONFIG_SUNXI_SPI)
 	init_spi_all();
 #endif
+#ifdef CONFIG_CLK_SUNXI
+	clk_init();
+#endif
 	if (!gd->boot_logo_addr) {
-
 		tick_printf("flash init start\n");
 #ifdef CONFIG_SUNXI_FLASH
 		ret = sunxi_flash_init_ext();
 		if (ret)
 			return ret;
+#endif
+	}
+#ifdef CONFIG_SUNXI_MELIS_AUTO_UPDATE
+	melis_auto_update_check();
+#endif
+
+	if (workmode == WORK_MODE_BOOT) {
+#if defined(CONFIG_AIOT_DISP_PARAM_UPDATE_DEBUG) || defined(CONFIG_AIOT_DISP_PARAM_UPDATE)
+extern int usb_auto_detect_device(void);
+		if (usb_auto_detect_device())
+			printf("no usb storage device detect!\n");
+		else
+			copy_update_file("disp_config.ini");
 #endif
 	}
 #if defined(CONFIG_BOARD_EARLY_INIT_R)
@@ -583,14 +602,13 @@ static int initr_sunxi_plat(void)
 	if (workmode == WORK_MODE_BOOT) {
 #ifdef CONFIG_SUNXI_UPDATE_GPT
 		int sunxi_update_gpt(void);
-		sunxi_update_gpt();
+		//sunxi_update_gpt();
 #endif
 
 #ifdef CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV
-	initr_env();
+		initr_env();
 #endif
-
-		sunxi_probe_partition_map();
+		//sunxi_probe_partition_map();
 	}
 
 #ifdef CONFIG_SUNXI_ROTPK_BURN_ENABLE_BY_TOOL
@@ -638,6 +656,7 @@ static int sunxi_fast_burn_key(void)
 
 static int sunxi_burn_key(void)
 {
+	return 0;
 #ifdef CONFIG_CMD_SUNXI_AUTO_FEL
 	sunxi_auto_fel_by_usb();
 #endif
@@ -679,8 +698,9 @@ static int should_load_env(void)
 static int initr_env(void)
 {
 	/* initialize environment */
-	if (should_load_env())
+	if (should_load_env()) {
 		env_relocate();
+	}
 	else
 		set_default_env(NULL);
 #ifdef CONFIG_OF_CONTROL
@@ -1032,6 +1052,9 @@ static init_fnc_t init_sequence_r[] = {
 #ifndef CONFIG_ENABLE_MTD_CMDLINE_PARTS_BY_ENV
 	initr_env,
 #endif
+#ifdef CONFIG_SOUND_SUNXI_BOOT_TONE
+	sunxi_boot_tone_play,
+#endif
 	board_env_late_init,
 #if defined(CONFIG_MICROBLAZE) || defined(CONFIG_M68K)
 	timer_init,		/* initialize timer */
@@ -1046,7 +1069,6 @@ static init_fnc_t init_sequence_r[] = {
 #ifdef CONFIG_ARCH_SUNXI
 	sunxi_burn_key,
 #endif
-
 #ifdef CONFIG_BOARD_LATE_INIT
 	board_late_init,
 #endif
@@ -1085,10 +1107,6 @@ static init_fnc_t init_sequence_r[] = {
 #endif
 #if defined(CONFIG_PRAM)
 	initr_mem,
-#endif
-
-#ifdef CONFIG_SOUND_SUNXI_BOOT_TONE
-	sunxi_boot_tone_play,
 #endif
 	run_main_loop,
 };

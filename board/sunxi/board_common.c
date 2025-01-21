@@ -627,11 +627,11 @@ void board_bootlogo_display(void)
 	}
 #endif
 
-#if defined(CONFIG_CMD_SUNXI_BMP)
-	sunxi_bmp_display("bootlogo.bmp");
-#elif defined(CONFIG_CMD_SUNXI_JPEG)
-	sunxi_jpeg_display("bootlogo.jpg");
-#endif
+//#if defined(CONFIG_CMD_SUNXI_BMP)
+//	sunxi_bmp_display("bootlogo.bmp");
+//#elif defined(CONFIG_CMD_SUNXI_JPEG)
+//	sunxi_jpeg_display("bootlogo.jpg");
+//#endif
 }
 #endif
 
@@ -773,17 +773,17 @@ int board_late_init(void)
 			ubi_nand_update_ubi_env();
 		else
 #endif
-		sunxi_update_partinfo();
-		if (sunxi_update_rotpk_info()) {
-			return -1;
-		}
+		//sunxi_update_partinfo();
+		//if (sunxi_update_rotpk_info()) {
+		//	return -1;
+		//}
 #ifdef CONFIG_SUNXI_POWER
 #ifdef CONFIG_SUNXI_BMU
 		axp_battery_status_handle();
 #endif
 #endif
 		sunxi_respond_ir_key_action();
-		sunxi_update_bootcmd();
+		//sunxi_update_bootcmd();
 #ifdef CONFIG_SUNXI_SERIAL
 		sunxi_set_serial_num();
 #endif

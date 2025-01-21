@@ -287,14 +287,10 @@ int use_android_image_dtb(void)
  *     0, if all existing images were loaded correctly
  *     1, if an image is found but corrupted, or invalid
  */
-int sunxi_update_fdt_para_for_kernel(void);
-
 int bootm_find_images(int flag, int argc, char * const argv[])
 {
-	 __attribute__((unused)) int ret;
+	int ret;
 
-#if !defined(CONFIG_SUNXI_INITRD_ROUTINE)
-	/* ramdisk manually processed, pass*/
 	/* find ramdisk */
 	ret = boot_get_ramdisk(argc, argv, &images, IH_INITRD_ARCH,
 			       &images.rd_start, &images.rd_end);
@@ -302,42 +298,9 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 		puts("Ramdisk image is corrupt or invalid\n");
 		return 1;
 	}
-#endif
-
 
 #if IMAGE_ENABLE_OF_LIBFDT
-#ifdef CONFIG_ARCH_SUNXI
-#if defined(CONFIG_OF_SEPARATE) && !defined(CONFIG_SUNXI_NECESSARY_REPLACE_FDT)
-/* If CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION is defined,
- * the dtb in the partition will be used and will not be executed here.
- *
- * If CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION is not defined,
- * Will use dtb in the Android image.
- * */
-#ifndef CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION
-	if (use_android_image_dtb()) {
-		puts("Use android image dtb fail!\n");
-		return 1;
-	}
-#endif
-#endif
-	images.ft_addr = (char *)gd->fdt_blob;
-	images.ft_len  = gd->fdt_size;
-	set_working_fdt_addr((ulong)images.ft_addr);
-
-	/* set this env variable for  function boot_relocate_fdt.
-	     use fdt in place
-	  */
 	env_set("fdt_high", "0xffffffff");
-#if defined(CONFIG_OF_SEPARATE) && !defined(CONFIG_SUNXI_NECESSARY_REPLACE_FDT)
-/* If CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION is defined,
- * this function will be called earlier,
- * so there is no need to call this function again. */
-#ifndef CONFIG_SUNXI_REPLACE_FDT_FROM_PARTITION
-	sunxi_update_fdt_para_for_kernel();
-#endif
-#endif
-#else
 	/* find flattened device tree */
 	ret = boot_get_fdt(flag, argc, argv, IH_ARCH_DEFAULT, &images,
 			   &images.ft_addr, &images.ft_len);
@@ -346,7 +309,6 @@ int bootm_find_images(int flag, int argc, char * const argv[])
 		return 1;
 	}
 	set_working_fdt_addr((ulong)images.ft_addr);
-#endif
 #endif
 
 #if IMAGE_ENABLE_FIT
@@ -564,7 +526,6 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 #endif
 	load_buf = map_sysmem(load, 0);
 	image_buf = map_sysmem(os.image_start, image_len);
-	sunxi_mem_info("kernel", load_buf, image_len);
 	err = bootm_decomp_image(os.comp, load, os.image_start, os.type,
 				 load_buf, image_buf, image_len,
 				 bootm_len, &load_end);
@@ -572,7 +533,10 @@ static int bootm_load_os(bootm_headers_t *images, int boot_progress)
 		bootstage_error(BOOTSTAGE_ID_DECOMP_IMAGE);
 		return err;
 	}
-
+	if (load != os.image_start) {
+		debug("The loading address of the kernel is not in the boot image\n");
+		sunxi_mem_info("kernel", load_buf, image_len);
+	}
 	flush_len = load_end - load;
 	if (flush_start < load)
 		flush_len += load - flush_start;
@@ -818,10 +782,12 @@ int do_bootm_states(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[],
 #ifdef CONFIG_TRACE
 	/* Pretend to run the OS, then run a user command */
 	if (!ret && (states & BOOTM_STATE_OS_FAKE_GO)) {
-		printf("fake go, dont actual boot\n");
-		return 0;
 		char *cmd_list = env_get("fakegocmd");
 
+		if (!cmd_list) {
+			printf("no fackegocmd, stop for manual process\n");
+			return 0;
+		}
 		ret = boot_selected_os(argc, argv, BOOTM_STATE_OS_FAKE_GO,
 				images, boot_fn);
 		if (!ret && cmd_list)
@@ -1041,11 +1007,6 @@ static int bootm_host_load_image(const void *fit, int req_image_type)
 	void *load_buf;
 	int ret;
 
-#ifdef CONFIG_ENV_IS_IN_SUNXI_FLASH
-	ulong bootm_len = env_get_hex("load_boot_len_max", CONFIG_SYS_BOOTM_LEN);
-#else
-	ulong bootm_len = CONFIG_SYS_BOOTM_LEN;
-#endif
 	memset(&images, '\0', sizeof(images));
 	images.verify = 1;
 	noffset = fit_image_load(&images, (ulong)fit,
@@ -1067,7 +1028,7 @@ static int bootm_host_load_image(const void *fit, int req_image_type)
 	/* Allow the image to expand by a factor of 4, should be safe */
 	load_buf = malloc((1 << 20) + len * 4);
 	ret = bootm_decomp_image(imape_comp, 0, data, image_type, load_buf,
-				 (void *)data, len, bootm_len,
+				 (void *)data, len, CONFIG_SYS_BOOTM_LEN,
 				 &load_end);
 	free(load_buf);
 

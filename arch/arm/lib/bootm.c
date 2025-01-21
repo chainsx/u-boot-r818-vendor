@@ -223,10 +223,23 @@ static void do_nonsec_virt_switch(void)
 }
 #endif
 
+int sunxi_drm_kernel_para_flush(void);
+
 /* Subcommand: PREP */
 static void boot_prep_linux(bootm_headers_t *images)
 {
 	char *commandline = env_get("bootargs");
+	
+#if defined(CONFIG_OF_LIBFDT)
+	int off;
+	if (images->ft_addr) {
+		off = fdt_path_offset(images->ft_addr, "/memory");
+		if (off > 0) {
+			if (arch_fixup_fdt(images->ft_addr))
+				puts("## WARNING: fixup memory failed!\n");
+		}
+	}
+#endif
 
 	if (IMAGE_ENABLE_OF_LIBFDT && images->ft_len) {
 #ifdef CONFIG_OF_LIBFDT
@@ -255,6 +268,7 @@ static void boot_prep_linux(bootm_headers_t *images)
 			 * addresses. So use them instead of images->rd_start &
 			 * images->rd_end when possible.
 			 */
+			printf("images->initrd_start: %#lx, images->initrd_end: %#lx\n", images->initrd_start, images->initrd_end);
 			if (images->initrd_start && images->initrd_end) {
 				setup_initrd_tag(gd->bd, images->initrd_start,
 						 images->initrd_end);
@@ -361,7 +375,7 @@ static void boot_jump_linux(bootm_headers_t *images, int flag)
 		}
 #endif
 		sunxi_mem_info("fdt", (void *)r2, images->ft_len);
-		memcpy((void *)r2, images->ft_addr, images->ft_len);
+		//memcpy((void *)r2, images->ft_addr, images->ft_len);
 	} else
 		r2 = gd->bd->bi_boot_params;
 	debug("## Linux machid: %08lx, FDT addr: %08lx\n", machid, r2);

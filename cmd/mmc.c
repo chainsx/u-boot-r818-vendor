@@ -12,6 +12,9 @@
 #include <sunxi_board.h>
 #include <sparse_format.h>
 #include <image-sparse.h>
+#ifdef CONFIG_SUNXI_SDMMC
+#include "../drivers/mmc/sunxi_mmc.h"
+#endif
 
 static int curr_device = -1;
 
@@ -873,6 +876,28 @@ static int do_mmc_bkops_enable(cmd_tbl_t *cmdtp, int flag,
 }
 #endif
 
+#ifdef CONFIG_SUNXI_SDMMC
+static int do_mmc_tuning(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct mmc *mmc;
+	int dev = simple_strtoul(argv[1], NULL, 10);
+	mmc = find_mmc_device(dev);
+	if (!mmc) {
+		printf("no mmc device at slot %x\n", dev);
+		return CMD_RET_FAILURE;
+	}
+
+	struct sunxi_mmc_priv *priv = mmc->priv;
+	struct mmc_config *cfg = &priv->cfg;
+	cfg->force_boot_tuning = 1;
+	mmc->has_init = 0;
+
+	if (mmc_init(mmc))
+		return CMD_RET_FAILURE;
+	return CMD_RET_SUCCESS;
+}
+#endif
+
 static cmd_tbl_t cmd_mmc[] = {
 	U_BOOT_CMD_MKENT(info, 1, 0, do_mmcinfo, "", ""),
 	U_BOOT_CMD_MKENT(read, 4, 1, do_mmc_read, "", ""),
@@ -884,7 +909,7 @@ static cmd_tbl_t cmd_mmc[] = {
 	U_BOOT_CMD_MKENT(swrite, 3, 0, do_mmc_sparse_write, "", ""),
 #endif
 	U_BOOT_CMD_MKENT(rescan, 1, 1, do_mmc_rescan, "", ""),
-	U_BOOT_CMD_MKENT(part, 1, 1, do_mmc_part, "", ""),
+	U_BOOT_CMD_MKENT(part, 2, 1, do_mmc_part, "", ""),
 	U_BOOT_CMD_MKENT(dev, 3, 0, do_mmc_dev, "", ""),
 	U_BOOT_CMD_MKENT(list, 1, 1, do_mmc_list, "", ""),
 #if CONFIG_IS_ENABLED(MMC_HW_PARTITIONING)
@@ -902,6 +927,9 @@ static cmd_tbl_t cmd_mmc[] = {
 	U_BOOT_CMD_MKENT(setdsr, 2, 0, do_mmc_setdsr, "", ""),
 #ifdef CONFIG_CMD_BKOPS_ENABLE
 	U_BOOT_CMD_MKENT(bkops-enable, 2, 0, do_mmc_bkops_enable, "", ""),
+#endif
+#ifdef CONFIG_SUNXI_SDMMC
+	U_BOOT_CMD_MKENT(tuning, 2, 0, do_mmc_tuning, "", ""),
 #endif
 };
 
@@ -921,7 +949,7 @@ static int do_mmcops(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		return CMD_RET_SUCCESS;
 
 	if (curr_device < 0) {
-		if (get_mmc_num() > 0) {
+		if (get_mmc_num() >= 0) {
 			curr_device = 0;
 		} else {
 			puts("No MMC device available\n");
@@ -1011,8 +1039,8 @@ int do_card0_probe(cmd_tbl_t *cmdtp, int flag,
 		puts("card0 init failed\n");
 		return  -1;
 	}
-	run_command("mmcinfo", 0);
-	run_command("mmc part", 0);
+	//run_command("mmcinfo", 0);
+	//run_command("mmc part", 0);
 	card0_init = 1;
 	return 0;
 }
